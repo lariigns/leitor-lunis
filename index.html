@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LUNIS | Leitor de ingressos</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 28px 18px;
+      background: #100d1b;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    main {
+      width: 100%;
+      max-width: 440px;
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 34px;
+      letter-spacing: 8px;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .subtitulo {
+      color: #bdb2d8;
+      margin-bottom: 28px;
+    }
+
+    .painel {
+      padding: 20px;
+      background: #1c172b;
+      border: 1px solid #44365e;
+      border-radius: 18px;
+    }
+
+    #reader {
+      width: 100%;
+      overflow: hidden;
+      border-radius: 12px;
+    }
+
+    button {
+      width: 100%;
+      padding: 15px;
+      margin-top: 14px;
+      border: 0;
+      border-radius: 10px;
+      background: #b99aff;
+      color: #171023;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: .5;
+    }
+
+    input {
+      width: 100%;
+      margin-top: 18px;
+      padding: 14px;
+      border: 1px solid #65517e;
+      border-radius: 10px;
+      background: #100d1b;
+      color: white;
+      font-size: 16px;
+    }
+
+    #mensagem {
+      min-height: 42px;
+      margin-top: 16px;
+      line-height: 1.5;
+      color: #d7cbea;
+    }
+
+    .aviso {
+      margin-top: 22px;
+      color: #a99dbd;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <div class="logo">LUNIS</div>
+    <div class="subtitulo">Sistema de validação de ingressos</div>
+
+    <section class="painel">
+      <div id="reader"></div>
+
+      <button id="iniciar" onclick="iniciarLeitor()">
+        ABRIR CÂMERA
+      </button>
+
+      <input
+        id="codigo"
+        type="text"
+        placeholder="Ou digite o código do ingresso"
+        autocomplete="off"
+      >
+
+      <button onclick="validarDigitado()">
+        VALIDAR CÓDIGO
+      </button>
+
+      <div id="mensagem" role="status">
+        Aponte a câmera para o QR Code do ingresso.
+      </div>
+    </section>
+
+    <div class="aviso">
+      LUNIS · A entrada será registrada na planilha após a validação.
+    </div>
+  </main>
+
+  <script>
+    const APP_URL =
+      'https://script.google.com/macros/s/AKfycbwrRHU5u8cprf81kv9d_1-CGrHWDPODMmvtqE-MZCts03igCg0cQTtK3Zhj6US19emKOg/exec';
+
+    let leitor = null;
+    let processando = false;
+
+    function mostrarMensagem(texto) {
+      document.getElementById('mensagem').textContent = texto;
+    }
+
+    function enviarCodigo(valor) {
+      const codigo = String(valor || '').trim().toUpperCase();
+
+      if (!/^LUNIS-\d{4,}$/.test(codigo)) {
+        mostrarMensagem(
+          'Código inválido. Confira o código do ingresso.'
+        );
+        return;
+      }
+
+      mostrarMensagem('Enviando código para validação...');
+      window.location.href =
+        APP_URL + '?codigo=' + encodeURIComponent(codigo);
+    }
+
+    function validarDigitado() {
+      enviarCodigo(document.getElementById('codigo').value);
+    }
+
+    async function iniciarLeitor() {
+      const botao = document.getElementById('iniciar');
+      botao.disabled = true;
+      mostrarMensagem('Solicitando acesso à câmera...');
+
+      try {
+        if (!window.Html5Qrcode) {
+          throw new Error('A biblioteca do leitor não carregou.');
+        }
+
+        leitor = new Html5Qrcode('reader');
+
+        await leitor.start(
+          { facingMode: 'environment' },
+          {
+            fps: 10,
+            qrbox: { width: 230, height: 230 }
+          },
+          async (textoLido) => {
+            if (processando) return;
+            processando = true;
+
+            try {
+              await leitor.stop();
+            } catch (e) {}
+
+            enviarCodigo(textoLido);
+          },
+          () => {}
+        );
+
+        mostrarMensagem('Câmera ativa. Aponte para o QR Code.');
+      } catch (erro) {
+        mostrarMensagem(
+          'Não consegui abrir a câmera. Confira a permissão do navegador e tente novamente.'
+        );
+
+        botao.disabled = false;
+
+        if (leitor) {
+          try {
+            await leitor.clear();
+          } catch (e) {}
+          leitor = null;
+        }
+      }
+    }
+  </script>
+</body>
+</html>
